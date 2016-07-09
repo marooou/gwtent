@@ -19,18 +19,9 @@
 
 package com.gwtent.gen.reflection;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
-
 import com.google.gwt.core.ext.TreeLogger;
 import com.google.gwt.core.ext.TreeLogger.Type;
-import com.google.gwt.core.ext.typeinfo.JAnnotationMethod;
-import com.google.gwt.core.ext.typeinfo.JAnnotationType;
-import com.google.gwt.core.ext.typeinfo.JClassType;
-import com.google.gwt.core.ext.typeinfo.JField;
-import com.google.gwt.core.ext.typeinfo.JMethod;
-import com.google.gwt.core.ext.typeinfo.NotFoundException;
-import com.google.gwt.core.ext.typeinfo.TypeOracle;
+import com.google.gwt.core.ext.typeinfo.*;
 import com.google.gwt.user.rebind.SourceWriter;
 import com.gwtent.common.client.CheckedExceptionWrapper;
 import com.gwtent.gen.reflection.accessadapter.JFeildAdapter;
@@ -40,6 +31,9 @@ import com.gwtent.reflection.client.ClassType;
 import com.gwtent.reflection.client.ReflectionTarget;
 import com.gwtent.reflection.client.ReflectionUtils;
 import com.gwtent.reflection.client.impl.TypeOracleImpl;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 
 public class GeneratorHelper {
 	
@@ -207,7 +201,7 @@ public class GeneratorHelper {
 	  		source.print(dest + ".addAnnotation(" + createAnnotationValues(typeOracle, annotation, logger) + ");");
 				
 	  	}else{
-	  		logger.log(Type.ERROR, "Annotation (" + ReflectionUtils.getQualifiedSourceName(annotation.annotationType()) + ") not exists in compiled client source code, please ensure this class is exists and included in your module(.gwt.xml) file. GWTENT reflection process will ignore it and continue. ");
+	  		logger.log(Type.WARN, "Annotation (" + ReflectionUtils.getQualifiedSourceName(annotation.annotationType()) + ") not exists in compiled client source code, please ensure this class is exists and included in your module(.gwt.xml) file. GWTENT reflection process will ignore it and continue. ");
 	  	}
     }
 	}
@@ -239,7 +233,7 @@ public class GeneratorHelper {
 			sb.append("}))");
 			
   	}else{
-  		logger.log(Type.ERROR, "Annotation (" + ReflectionUtils.getQualifiedSourceName(annotation.annotationType()) + ") not exists in compiled client source code, please ensure this class is exists and included in your module(.gwt.xml) file. GWTENT reflection process will ignore it and continue. ");
+  		logger.log(Type.WARN, "Annotation (" + ReflectionUtils.getQualifiedSourceName(annotation.annotationType()) + ") not exists in compiled client source code, please ensure this class is exists and included in your module(.gwt.xml) file. GWTENT reflection process will ignore it and continue. ");
   	}
   	return sb.toString();
 	}

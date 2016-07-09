@@ -13,5 +13,7 @@
 	
 	<inherits name="com.gwtent.reflection.emul.Emulation" />
 
+	<define-configuration-property name="gwtent.reflection.exclude" is-multi-valued="true" />
+
 	<source path="client" />
 </module>

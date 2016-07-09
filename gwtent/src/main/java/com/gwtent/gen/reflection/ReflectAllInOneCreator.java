@@ -19,60 +19,45 @@
 
 package com.gwtent.gen.reflection;
 
-import java.io.PrintWriter;
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import com.google.gwt.core.ext.GeneratorContext;
 import com.google.gwt.core.ext.TreeLogger;
-import com.google.gwt.core.ext.typeinfo.HasAnnotations;
-import com.google.gwt.core.ext.typeinfo.JAnnotationMethod;
-import com.google.gwt.core.ext.typeinfo.JAnnotationType;
-import com.google.gwt.core.ext.typeinfo.JClassType;
-import com.google.gwt.core.ext.typeinfo.JField;
-import com.google.gwt.core.ext.typeinfo.JMethod;
-import com.google.gwt.core.ext.typeinfo.JParameter;
-import com.google.gwt.core.ext.typeinfo.JType;
-import com.google.gwt.core.ext.typeinfo.NotFoundException;
-import com.google.gwt.core.ext.typeinfo.AnnotationsHelper;
+import com.google.gwt.core.ext.typeinfo.*;
 import com.google.gwt.user.rebind.ClassSourceFileComposerFactory;
 import com.google.gwt.user.rebind.SourceWriter;
+import com.gwtent.common.QualifiedSourceNameComparator;
 import com.gwtent.common.client.CheckedExceptionWrapper;
 import com.gwtent.gen.GenExclusion;
 import com.gwtent.gen.GenUtils;
 import com.gwtent.gen.LogableSourceCreator;
-import com.gwtent.gen.reflection.ReflectionCreator.ReflectionSourceCreator;
 import com.gwtent.reflection.client.HasReflect;
 import com.gwtent.reflection.client.Reflectable;
-import com.gwtent.reflection.client.ReflectionTarget;
 import com.gwtent.reflection.client.ReflectionUtils;
-import com.gwtent.reflection.client.Type;
 import com.gwtent.reflection.client.impl.TypeOracleImpl;
 
+import java.io.PrintWriter;
+import java.lang.annotation.*;
+import java.lang.reflect.Array;
+import java.util.*;
+
 public class ReflectAllInOneCreator extends LogableSourceCreator {
-	
+
+	private static final String EXCLUSION_PROPERTY = "gwtent.reflection.exclude";
+	private final Exclusions exclusions;
 	private List<String> allGeneratedClassNames = new ArrayList<String>();
 	private Set<JClassType> relationClassesProcessed = new HashSet<JClassType>();
+	private List<JClassType> excludedClasses = new ArrayList<JClassType>();
 
 	public ReflectAllInOneCreator(TreeLogger logger, GeneratorContext context,
 			String typeName) {
 		super(logger, context, typeName);
-		
+		exclusions = Exclusions.fromConfigurationProperty(context, EXCLUSION_PROPERTY);
+
 //		try {
 //			System.out.println(context.getPropertyOracle().getPropertyValue(logger, "locale______"));
 //		} catch (BadPropertyValueException e) {
 //			//nothing, there is no exclusion setting
 //		}
+
 	}
 
 	protected GenExclusion getGenExclusion(){
@@ -91,8 +76,6 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 	public void createSource(SourceWriter source, JClassType classType) {
 		//ClassType -->> the interface name created automatically
 		Map<JClassType, String> typeNameMap = new HashMap<JClassType, String>();
-				
-		
 		genAllClasses(source, typeNameMap);
 		
 //		source.println("public " + getSimpleUnitName(classType) + "(){");
@@ -121,13 +104,28 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 	}
 	
 	private void genAllClasses(SourceWriter sourceWriter, Map<JClassType, String> typeNameMap){
-		for(JClassType type : candidateList){
-			String className = type.getPackage().getName().replace('.', '_') + '_' + getSimpleUnitNameWithOutSuffix(type) + "_GWTENTAUTO_ClassType"; //type.getPackage().getName().replace('.', '_') + '_' + type.getSimpleSourceName().replace('.', '_'); //getSimpleUnitName(type);
-			
-			sourceWriter.println("@ReflectionTarget(value=\"" + type.getQualifiedSourceName() + "\")");
-			sourceWriter.println("public static interface " + className + " extends com.gwtent.reflection.client.ClassType {}");
-			
-			typeNameMap.put(type, className);
+		Comparator<JClassType> comparator = new QualifiedSourceNameComparator();
+		Collections.sort(candidateList, comparator);
+		Collections.sort(excludedClasses, comparator);
+
+		if (candidateList.size() > 0) {
+			logger.log(TreeLogger.Type.INFO, "The following classes will be reflected (" + candidateList.size() + "):");
+			for (JClassType type : candidateList) {
+				logCandidate(type);
+				String className = type.getPackage().getName().replace('.', '_') + '_' + getSimpleUnitNameWithOutSuffix(type) + "_GWTENTAUTO_ClassType"; //type.getPackage().getName().replace('.', '_') + '_' + type.getSimpleSourceName().replace('.', '_'); //getSimpleUnitName(type);
+
+				sourceWriter.println("@ReflectionTarget(value=\"" + type.getQualifiedSourceName() + "\")");
+				sourceWriter.println("public static interface " + className + " extends com.gwtent.reflection.client.ClassType {}");
+
+				typeNameMap.put(type, className);
+			}
+		}
+
+		if (excludedClasses.size() > 0) {
+			logger.log(TreeLogger.Type.INFO, "The following classes will NOT be reflected due to exclusion (" + excludedClasses.size() + "):");
+			for (JClassType type : excludedClasses) {
+				logExclusionCandidate(type);
+			}
 		}
 	}
 	
@@ -136,13 +134,14 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 	private void getAllReflectionClasses() throws NotFoundException{
 
 		//System annotations
-		addClassIfNotExists(typeOracle.getType(Retention.class.getCanonicalName()), ReflectableHelper.getDefaultSettings(typeOracle));
-		addClassIfNotExists(typeOracle.getType(Documented.class.getCanonicalName()), ReflectableHelper.getDefaultSettings(typeOracle));
-		addClassIfNotExists(typeOracle.getType(Inherited.class.getCanonicalName()), ReflectableHelper.getDefaultSettings(typeOracle));
-		addClassIfNotExists(typeOracle.getType(Target.class.getCanonicalName()), ReflectableHelper.getDefaultSettings(typeOracle));
-		addClassIfNotExists(typeOracle.getType(Deprecated.class.getCanonicalName()), ReflectableHelper.getDefaultSettings(typeOracle));
+		addPredefinedClass(Retention.class);
+		addPredefinedClass(Documented.class);
+		addPredefinedClass(Inherited.class);
+		addPredefinedClass(Target.class);
+		addPredefinedClass(Deprecated.class);
+
 		//typeOracle.getType("com.gwtent.client.test.reflection.TestReflectionGenerics.TestReflection1");
-		
+
 		//=====GWT0.7
 		for (JClassType classType : typeOracle.getTypes()) {
 			Reflectable reflectable = GenUtils.getClassTypeAnnotationWithMataAnnotation(classType, Reflectable.class);
@@ -159,13 +158,20 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 		//======end of gwt0.7
 	}
 
+	private <T> void addPredefinedClass(Class<T> clazz) throws NotFoundException {
+		JClassType classType = typeOracle.getType(clazz.getCanonicalName());
+		if (classType != null) {
+			addClassIfNotExists(classType, ReflectableHelper.getDefaultSettings(typeOracle));
+		}
+	}
+
 	private void processClass(Class<?> clazz, Reflectable reflectable) {
 		processClass(typeOracle.findType(ReflectionUtils.getQualifiedSourceName(clazz)), reflectable);
 	}
 	
 	private void processClass(JClassType classType, Reflectable reflectable) {
 		if (! genExclusion(classType)){
-			if (addClassIfNotExists(classType, reflectable)) { 
+			if (addClassIfNotExists(classType, reflectable)) {
 				processRelationClasses(classType, reflectable);
 				processAnnotationClasses(classType, reflectable);
 			}
@@ -217,11 +223,11 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 				classType.isTypeParameter() != null)
 			classType = classType.getErasedType();
 		
-		if (relationClassesProcessed.contains(classType))
+		if (relationClassesProcessed.contains(classType)) {
 			return;
-		
+		}
+
 		processAnnotationClasses(classType, reflectable);
-		
 		if (reflectable.superClasses()){
 			if (classType.getSuperclass() != null){
 				processRelationClass(classType.getSuperclass(), reflectable);
@@ -235,11 +241,7 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 		}
 
 		relationClassesProcessed.add(classType);
-		
-		
-		
 		processFields(classType, reflectable);
-		
 		processMethods(classType, reflectable);
 	}
 
@@ -247,16 +249,19 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 		boolean need = reflectable.relationTypes();
 		
 		for (JField field : classType.getFields()) {
-			if (reflectable.fieldAnnotations() || (hasReflectionAnnotation(field))){
+			if (reflectable.fieldAnnotations() || (hasReflectionAnnotation(field))) {
 				processAnnotationClasses(field, reflectable);
-			  
 				JClassType type = field.getType().isClassOrInterface();
-			  if (type != null)
-			  	if (need || (hasReflection(field) && field.getAnnotation(HasReflect.class).fieldType()))
-			  	if (! type.isAssignableTo(classType))  //some times, it's itself of devided class
-	  		  	processRelationClasses(type, reflectable);
-			  
-			  addClassIfNotExists(type, reflectable);
+				if (type != null) {
+					if (need || (hasReflection(field) && field.getAnnotation(HasReflect.class).fieldType())) {
+						if (!type.isAssignableTo(classType))  //some times, it's itself of devided class
+						{
+							processRelationClasses(type, reflectable);
+						}
+					}
+
+					addClassIfNotExists(type, reflectable);
+				}
 			}
 				
 		}
@@ -264,21 +269,20 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 
 	private void processMethods(JClassType classType, Reflectable reflectable) {
 		boolean need = reflectable.relationTypes();
-		for (JMethod method : classType.getMethods()){
+		for (JMethod method : classType.getMethods()) {
 			if (reflectable.fieldAnnotations() || (hasReflectionAnnotation(method))){
 				processAnnotationClasses(method, reflectable);
-				
 				HasReflect hasReflect = method.getAnnotation(HasReflect.class);
 				JClassType type = null;
 				
 				if (need || (hasReflect != null && hasReflect.resultType())){
 					if (method.getReturnType() != null && method.getReturnType().isClassOrInterface() != null){
 						type = method.getReturnType().isClassOrInterface();
-						
-						if (! type.isAssignableTo(classType))
+						if (!type.isAssignableTo(classType)) {
 							processRelationClasses(type, reflectable);
-						
-					  addClassIfNotExists(type, reflectable);
+						}
+
+						addClassIfNotExists(type, reflectable);
 					}
 				}
 				
@@ -287,11 +291,12 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 			  	for (JParameter parameter :method.getParameters()){
 						if (parameter.getType() != null && parameter.getType().isClassOrInterface() != null){
 							type = parameter.getType().isClassOrInterface();
-							
-							if (! type.isAssignableTo(classType))
+
+							if (!type.isAssignableTo(classType)) {
 								processRelationClasses(type, reflectable);
-							
-						  addClassIfNotExists(type, reflectable);
+							}
+
+							addClassIfNotExists(type, reflectable);
 						}
 					}
 			  }
@@ -330,7 +335,7 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 	     
 	     if (classType == null)
 	    	 return; //
-	     
+
 	     addClassIfNotExists(classType, getNearestSetting(classType, getFullSettings()));
 	     
 	     //Go through all annotation methods, if has class, add that class to reflection as well
@@ -372,7 +377,7 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 	     }
 	   }
 	}
-	
+
 	private void processJType(JType type){
 		JClassType classType = null;
 		if (type.isClassOrInterface() != null){
@@ -404,14 +409,26 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 		//no need java.lang.class
 		if (classType.getQualifiedSourceName().equals("java.lang.Class"))
 			return false;
-		
-		if (candidateList.indexOf(classType.getErasedType()) < 0){
+
+		if (shouldExclude(classType)) {
+			if (excludedClasses.indexOf(classType.getErasedType()) < 0) {
+				excludedClasses.add(classType.getErasedType());
+			}
+
+			return false;
+		}
+
+		if (candidateList.indexOf(classType.getErasedType()) < 0) {
 			candidateList.add(classType.getErasedType());
 			candidates.put(classType.getErasedType(), setting);
 			return true;
 		}
 		
 		return false;
+	}
+
+	private boolean shouldExclude(JClassType classType) {
+		return exclusions.shouldExclude(classType.getQualifiedSourceName());
 	}
 
 	protected SourceWriter doGetSourceWriter(JClassType classType) throws NotFoundException {
@@ -452,6 +469,25 @@ public class ReflectAllInOneCreator extends LogableSourceCreator {
 			return sw;
 		}
 	}
+
+
+	private void logCandidate(JClassType classType) {
+		if (logger.isLoggable(TreeLogger.Type.INFO)) {
+			Reflectable settings = candidates.get(classType);
+			logger.log(TreeLogger.Type.INFO, String.format("  [%s] %s", getReflectableInfo(settings), classType.getParameterizedQualifiedSourceName()));
+		}
+	}
+	private void logExclusionCandidate(JClassType classType) {
+		if (logger.isLoggable(TreeLogger.Type.INFO)) {
+			logger.log(TreeLogger.Type.INFO, String.format("  %s", classType.getParameterizedQualifiedSourceName()));
+		}
+	}
+
+	private String getReflectableInfo(Reflectable reflectable) {
+		return String.format("ctors:%d, methods:%d, fields:%d",
+				reflectable.constructors() ? 1 : 0, reflectable.methods() ? 1 : 0, reflectable.fields() ? 1 : 0);
+	}
+
 
 
 }

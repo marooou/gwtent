@@ -5,7 +5,7 @@
 	<groupId>com.gwtent</groupId>
 	<artifactId>gwtent.parent</artifactId>
 	<packaging>pom</packaging>
-	<version>2.1</version>
+	<version>2.2.0-SNAPSHOT</version>
 	<name>A Reflection, AOP, HTML template, UI Binding, Validate(JSR303) framework and JPA annotation Emulation for GWT. Parent Project</name>
 	<url>http://code.google.com/p/gwt-ent/</url>
 
@@ -25,7 +25,7 @@
 		<org.aspectj.version>1.6.2</org.aspectj.version>
 		<aspectjrt.version>1.6.2</aspectjrt.version>
 		<aspectjweaver.version>1.6.2</aspectjweaver.version>
-		<gwt.version>2.5.1</gwt.version>
+		<gwt.version>2.7.0</gwt.version>
 		<gwt-gears.version>1.2.1</gwt-gears.version>
 		<datanucleus-appengine.version>1.0.0</datanucleus-appengine.version>
 		<datanucleus-core.version>1.1.0</datanucleus-core.version>
@@ -34,7 +34,7 @@
 		<gxt.version>2.1.1</gxt.version>
 		<gwtext.version>2.0.5</gwtext.version>
 		<log4j.version>1.2.15</log4j.version>
-		<gwtent.version>2.1</gwtent.version>
+		<gwtent.version>2.2.0-SNAPSHOT</gwtent.version>
 		<gae.version>1.2.0</gae.version>
 		<gae.port>8080</gae.port>
 	</properties>
