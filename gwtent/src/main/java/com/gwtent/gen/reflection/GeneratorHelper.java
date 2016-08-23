@@ -137,23 +137,7 @@ public class GeneratorHelper {
 		
 		return result.toString();
 	}
-	
-	/**
-	 * generator metaData
-	 * @param dest field or method or class
-	 * @param source source to print code
-	 * @param metaData 
-	 */
-	public static void addMetaDatas(String dest, SourceWriter source, com.google.gwt.core.ext.typeinfo.HasMetaData metaData) {
-		String[] tags = metaData.getMetaDataTags();
-		for (int j = 0; j < tags.length; j++){
-			String[][] metas = metaData.getMetaData(tags[j]);
-			for (int k = 0; k < metas.length; k++){
-				source.println(dest + ".addMetaData(\"" + tags[j] + "\", " + GeneratorHelper.stringArrayToCode(metas[k]) +  ");");
-			}
-		}
-	}
-	
+
 	public static String processInvertedComma(String str){
 //		return str.replaceAll("\"", "\\\"");
 		StringBuffer sb = new StringBuffer();
